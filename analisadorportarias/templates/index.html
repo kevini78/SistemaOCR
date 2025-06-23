@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Analisador de Portarias - MJ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Rawline:wght@300;400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary-default: #1351b4;
+            --color-secondary-01: #fff;
+            --color-secondary-02: #f8f8f8;
+            --color-secondary-03: #ededed;
+            --color-secondary-04: #ccc;
+            --color-secondary-07: #555;
+            --color-secondary-08: #333;
+            --font-family-base: Rawline, Raleway, sans-serif;
+        }
+
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+
+        html {
+            font-size: 62.5%;
+        }
+
+        body { 
+            font-family: var(--font-family-base);
+            background: var(--color-secondary-01);
+            color: var(--color-secondary-08);
+            font-size: 1.6rem;
+            line-height: 1.75;
+        }
+        
+        .header {
+            background: var(--color-secondary-01);
+            color: var(--color-secondary-08);
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--color-secondary-03);
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .logo img {
+            height: 40px;
+        }
+        
+        .header-divider {
+            height: 32px;
+            border-left: 1px solid var(--color-secondary-04);
+        }
+
+        .site-name {
+            font-size: 2rem;
+            font-weight: 600;
+        }
+        
+        .nav a {
+            color: var(--color-secondary-07);
+            text-decoration: none;
+            font-weight: 500;
+            margin-left: 2rem;
+            font-size: 1.6rem;
+            transition: color 0.2s;
+        }
+        
+        .nav a:hover {
+            color: var(--color-primary-default);
+        }
+        
+        .main {
+            max-width: 960px;
+            margin: 4rem auto;
+            padding: 0 2rem;
+        }
+        
+        .card {
+            background: var(--color-secondary-01);
+            border-radius: 8px;
+            padding: 4rem;
+            text-align: center;
+            border: 1px solid var(--color-secondary-03);
+        }
+        
+        .card h2 {
+            font-size: 2.8rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card p {
+            font-size: 1.8rem;
+            color: var(--color-secondary-07);
+            margin-bottom: 3rem;
+            line-height: 1.6;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 1.2rem 2.5rem;
+            border: 1px solid var(--color-primary-default);
+            border-radius: 6px;
+            font-size: 1.6rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+            font-family: var(--font-family-base);
+        }
+        
+        .btn-primary {
+            background: var(--color-primary-default);
+            color: var(--color-secondary-01);
+        }
+        
+        .btn-primary:hover {
+            background: #0c326f; /* primary-darken-01 */
+            border-color: #0c326f;
+        }
+        
+        .btn-secondary {
+            background: var(--color-secondary-01);
+            color: var(--color-primary-default);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--color-secondary-02);
+        }
+        
+        .footer {
+            background: var(--color-secondary-01);
+            color: var(--color-secondary-07);
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 6rem;
+            border-top: 1px solid var(--color-secondary-03);
+        }
+        
+        .footer p {
+            font-size: 1.4rem;
+        }
+        
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+            
+            .nav {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                gap: 1rem;
+            }
+
+            .nav a {
+                margin: 0 1rem;
+            }
+            
+            .card {
+                padding: 2.5rem 2rem;
+            }
+            
+            .buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo-container">
+                <a href="/" class="logo"><img src="/static/images/logo-mj.png" alt="Logo MJ"></a>
+                <span class="header-divider"></span>
+                <span class="site-name">Analisador de Portarias</span>
+            </div>
+            <nav class="nav">
+                <a href="/">Início</a>
+                <a href="/configurar">Configurar</a>
+                <a href="/analisar">Analisar</a>
+            </nav>
+        </div>
+    </header>
+    
+    <main class="main">
+        <div class="card">
+            <h2>Bem-vindo ao Sistema</h2>
+            <p>Análise de portarias de naturalização para encontrar erros e inconsistências.</p>
+            <div class="buttons">
+                <a href="/configurar" class="btn btn-primary">Configurar Histórico</a>
+                <a href="/analisar" class="btn btn-secondary">Analisar Portaria</a>
+            </div>
+        </div>
+    </main>
+    
+    <footer class="footer">
+        <p>Ministério da Justiça e Segurança Pública</p>
+    </footer>
+</body>
+</html> 
