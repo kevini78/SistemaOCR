@@ -11,6 +11,7 @@ import time
 import os
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
+
 class PortariaAnalyzer:
     def __init__(self, planilha_historico_path=None):
         """
@@ -41,23 +42,23 @@ class PortariaAnalyzer:
             'COREIA DO SUL', 'COSTA DO MARFIM', 'COSTA RICA', 'CROÁCIA', 'CUBA', 'DINAMARCA', 
             'DJIBUTI', 'DOMINICA', 'EGITO', 'EL SALVADOR', 'EMIRADOS ÁRABES UNIDOS', 'EQUADOR', 
             'ERITREIA', 'ESLOVÁQUIA', 'ESLOVÊNIA', 'ESPANHA', 'ESTADOS UNIDOS', 'ESTÔNIA', 
-            'ESWATINI', 'ETIÓPIA', 'FIJI', 'FILIPINAS', 'FINLÂNDIA', 'FRANÇA', 'GABÃO', 
+            'ESWATINI', 'ETIÓPIA', 'FIJI', 'FILIPINAS', 'FINLÂNDIA', 'FRANÇA', 'FRANÇA METROPOLITANA', 'GABÃO', 
             'GÂMBIA', 'GANA', 'GEÓRGIA', 'GRANADA', 'GRÉCIA', 'GUATEMALA', 'GUIANA', 
             'GUINÉ', 'GUINÉ-BISSAU', 'GUINÉ EQUATORIAL', 'HAITI', 'HONDURAS', 'HUNGRIA', 
             'IÊMEN', 'ILHAS MARSHALL', 'ILHAS SALOMÃO', 'ÍNDIA', 'INDONÉSIA', 'IRÃ', 
             'IRAQUE', 'IRLANDA', 'ISLÂNDIA', 'ISRAEL', 'ITÁLIA', 'JAMAICA', 'JAPÃO', 
-            'JORDÂNIA', 'KOSOVO', 'KUWAIT', 'LAOS', 'LESOTO', 'LETÔNIA', 'LÍBANO', 
+            'JORDÂNIA', 'KOSOVO', 'KUWAIT', 'LAOS', 'LESOTO', 'LETÔNIA', 'LÍBANO', 'LIBANO', 
             'LIBÉRIA', 'LÍBIA', 'LIECHTENSTEIN', 'LITUÂNIA', 'LUXEMBURGO', 'MACEDÔNIA DO NORTE', 
             'MADAGASCAR', 'MALÁSIA', 'MALAWI', 'MALDIVAS', 'MALI', 'MALTA', 'MARROCOS', 
             'MAURÍCIO', 'MAURITÂNIA', 'MÉXICO', 'MIANMAR', 'MICRONÉSIA', 'MOÇAMBIQUE', 
             'MOLDÁVIA', 'MÔNACO', 'MONGÓLIA', 'MONTENEGRO', 'NAMÍBIA', 'NAURU', 'NEPAL', 
-            'NICARÁGUA', 'NÍGER', 'NIGÉRIA', 'NORUEGA', 'NOVA ZELÂNDIA', 'OMÃ', 'PAÍSES BAIXOS', 
+            'NICARÁGUA', 'NÍGER', 'NIGÉRIA', 'NIGERIA', 'NORUEGA', 'NOVA ZELÂNDIA', 'OMÃ', 'PAÍSES BAIXOS', 
             'PALAU', 'PALESTINA', 'PANAMÁ', 'PAPUA-NOVA GUINÉ', 'PAQUISTÃO', 'PARAGUAI', 'PERU', 'POLÔNIA', 
             'PORTUGAL', 'QUÊNIA', 'QUIRGUIZISTÃO', 'REINO UNIDO', 'REPÚBLICA CENTRO-AFRICANA', 
             'REPÚBLICA DEMOCRÁTICA DO CONGO', 'REPÚBLICA DOMINICANA', 'REPÚBLICA TCHECA', 
-            'ROMÊNIA', 'RUANDA', 'RÚSSIA', 'SAMOA', 'SAN MARINO', 'SANTA LÚCIA', 
+            'ROMÊNIA', 'RUANDA', 'RÚSSIA', 'FEDERAÇÃO DA RÚSSIA', 'SAMOA', 'SAN MARINO', 'SANTA LÚCIA', 
             'SÃO CRISTÓVÃO E NEVIS', 'SÃO TOMÉ E PRÍNCIPE', 'SÃO VICENTE E GRANADINAS', 
-            'SEICHELES', 'SENEGAL', 'SERRA LEOA', 'SÉRVIA', 'SINGAPURA', 'SÍRIA', 
+            'SEICHELES', 'SENEGAL', 'SERRA LEOA', 'SÉRVIA', 'SINGAPURA', 'SÍRIA', 'SIRIA', 
             'SOMÁLIA', 'SRI LANKA', 'SUAZILÂNDIA', 'SUDÃO', 'SUDÃO DO SUL', 'SUÉCIA', 
             'SUÍÇA', 'SURINAME', 'TAILÂNDIA', 'TAIWAN', 'TAJIQUISTÃO', 'TANZÂNIA', 
             'TIMOR-LESTE', 'TOGO', 'TONGA', 'TRINIDAD E TOBAGO', 'TUNÍSIA', 'TURCOMENISTÃO', 
@@ -170,195 +171,220 @@ class PortariaAnalyzer:
     def extrair_dados_portaria(self, html_content):
         """
         Extrai dados estruturados da portaria
-        
         Args:
             html_content (str): Conteúdo HTML da portaria
-            
         Returns:
             dict: Dados estruturados da portaria
         """
         print("Extraindo dados da portaria...")
-        
         if not html_content:
             print("❌ Conteúdo HTML vazio")
             return None
-        
         soup = BeautifulSoup(html_content, 'html.parser')
-        texto_completo = soup.get_text()
-        
-        # Se não encontrou, tentar padrões alternativos
+        # Encontrar o <p> do cabeçalho da portaria
+        paragrafos = soup.find_all('p')
+        idx_inicio = -1
+        idx_fim = -1
+        for i, p in enumerate(paragrafos):
+            texto_p = p.get_text().strip()
+            if re.search(r'PORTARIA\s*[NnNº°]?', texto_p):
+                idx_inicio = i
+                break
+        if idx_inicio == -1:
+            print("❌ Não encontrou o cabeçalho da portaria em <p>")
+            texto_completo = soup.get_text()
+        else:
+            # Procurar o rodapé (primeiro <p> depois do início que começa com 'A pessoa referida' ou 'As pessoas referidas')
+            for j in range(idx_inicio+1, len(paragrafos)):
+                texto_p = paragrafos[j].get_text().strip()
+                if texto_p.startswith('A pessoa referida') or texto_p.startswith('As pessoas referidas'):
+                    idx_fim = j
+                    break
+            if idx_fim == -1:
+                # Se não achou rodapé, pega até o fim
+                blocos_pessoas = [p.get_text().strip() for p in paragrafos[idx_inicio:]]
+            else:
+                blocos_pessoas = [p.get_text().strip() for p in paragrafos[idx_inicio:idx_fim]]
+            texto_completo = '\n'.join(blocos_pessoas)
+        print(f"Texto extraído: {len(texto_completo)} caracteres")
+        print(f"Início do texto: {texto_completo[:500]}...")
+        # Extrair número e data da portaria
+        match_portaria = re.search(r'PORTARIA\s*,?\s*[NnNº°]?\s*(\d+[\.,]?\d*)\s*,?\s*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})', texto_completo, re.IGNORECASE)
         if not match_portaria:
-            padrao_alternativo = r'PORTARIA\s*(\d+[.,]?\d*)[\s,]*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})'
-            match = re.search(padrao_alternativo, texto_portaria, re.IGNORECASE)
-            if match:
-                match_portaria = match
-        
-        if not match_portaria:
-            print("❌ Nenhum padrão de portaria encontrado")
-            return None
-        
+            print("❌ Não foi possível extrair número/data da portaria")
+            print("Tentando padrões alternativos...")
+            patterns = [
+                r'PORTARIA\s*N[º°]?\s*(\d+[\.,]?\d*)[,,\s]*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})',
+                r'PORTARIA\s*(\d+[\.,]?\d*)[,,\s]*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})',
+                r'Portaria\s*n[º°]?\s*(\d+[\.,]?\d*)[,,\s]*de\s*(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})'
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, texto_completo, re.IGNORECASE)
+                if match:
+                    match_portaria = match
+                    break
+            if not match_portaria:
+                print("❌ Nenhum padrão de portaria encontrado")
+                return None
         numero_portaria = match_portaria.group(1)
         data_portaria = match_portaria.group(2)
-        
         print(f"✅ Portaria encontrada: {numero_portaria} de {data_portaria}")
-        
-        # Identificar tipo de naturalização
-        tipo_naturalizacao = self.identificar_tipo_naturalizacao(texto_portaria)
+        tipo_naturalizacao = self.identificar_tipo_naturalizacao(texto_completo)
         print(f"✅ Tipo identificado: {tipo_naturalizacao}")
-        
-        # Extrair pessoas
-        pessoas = self.extrair_pessoas(texto_portaria)
+        pessoas = self.extrair_pessoas(texto_completo)
         print(f"✅ Pessoas extraídas: {len(pessoas)}")
-        
         return {
             'numero': numero_portaria,
             'data': data_portaria,
             'tipo': tipo_naturalizacao,
             'pessoas': pessoas,
-            'texto_completo': texto_portaria
+            'texto_completo': texto_completo
         }
     
     def identificar_tipo_naturalizacao(self, texto):
         """Identifica o tipo de naturalização baseado no artigo e texto da portaria"""
         texto_lower = texto.lower()
-        
-        # Verificar se é tornar definitiva (art. 70 parágrafo único) - PRIORIDADE ALTA
-        if 'tornar definitiva' in texto_lower and 'art. 70' in texto_lower:
-            return 'DEFINITIVA'
-        
-        # Verificar se é naturalização provisória (art. 70) - PRIORIDADE ALTA
-        elif 'art. 70' in texto_lower and 'naturalização provisória' in texto_lower:
+        # 1. Provisória tem prioridade máxima
+        if 'naturalização provisória' in texto_lower:
             return 'PROVISORIA'
-        
-        # Verificar se é extraordinária (art. 67)
-        elif 'art. 67' in texto_lower:
-            return 'EXTRAORDINARIA'
-        
-        # Verificar se é ordinária (art. 65)
-        elif 'art. 65' in texto_lower:
-            return 'ORDINARIA'
-        
-        # Se não encontrou nenhum artigo específico, tentar identificar pelo contexto
-        elif 'tornar definitiva' in texto_lower:
+        # 2. Definitiva só se não houver provisória
+        if ('tornar definitiva' in texto_lower and 'art. 70' in texto_lower) or \
+           ('tornar definitiva' in texto_lower and 'parágrafo único' in texto_lower):
             return 'DEFINITIVA'
-        elif 'naturalização provisória' in texto_lower:
+        # 3. Provisória (art. 70)
+        if 'art. 70' in texto_lower and 'naturalização provisória' in texto_lower:
             return 'PROVISORIA'
-        elif 'extraordinária' in texto_lower:
-            return 'EXTRAORDINARIA'
-        elif 'ordinária' in texto_lower or 'por naturalização' in texto_lower:
+        # 4. Ordinária (art. 65) tem prioridade sobre extraordinária
+        if 'art. 65' in texto_lower:
             return 'ORDINARIA'
-        
+        # 5. Extraordinária (art. 67) só se não houver art. 65 ou art. 70
+        if 'art. 67' in texto_lower and 'art. 65' not in texto_lower and 'art. 70' not in texto_lower:
+            return 'EXTRAORDINARIA'
+        # 6. Fallbacks por contexto
+        if 'tornar definitiva' in texto_lower:
+            return 'DEFINITIVA'
+        if 'extraordinária' in texto_lower:
+            return 'EXTRAORDINARIA'
+        if 'ordinária' in texto_lower or 'por naturalização' in texto_lower:
+            return 'ORDINARIA'
         return 'DESCONHECIDO'
     
-    def extrair_pessoas(self, texto):
-        """Extrai dados das pessoas da portaria"""
-        print("Extraindo dados das pessoas...")
+    def extrair_pessoas(self, texto, forcar_linha_por_bloco=False):
+        """Extrai dados das pessoas da portaria, suportando múltiplos formatos"""
+        print("Extraindo dados das pessoas (robusto)...")
         pessoas = []
-        
-        # Padrões para extrair informações - mais flexíveis
-        patterns = [
-            # Padrão principal: NOME - DOCUMENTO, natural do PAÍS, nascido em DATA, filho de PAI
-            r'([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s*[-–,]\s*([A-Z]\d+[-]\w+|Processo\s+[][\d\.\/]+)\s*,?\s*natural\s+d[oa]\s+([A-ZÀ-Ú\s]+?)\s*,?\s*nascid[oa]\s+em\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})\s*,?\s*filh[oa]\s+de\s+([A-ZÀ-Ú\s]+)',
-            
-            # Padrão alternativo sem "filho de"
-            r'([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s*[-–,]\s*([A-Z]\d+[-]\w+|Processo\s+[][\d\.\/]+)\s*,?\s*natural\s+d[oa]\s+([A-ZÀ-Ú\s]+?)\s*,?\s*nascid[oa]\s+em\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})',
-            
-            # Padrão para casos onde o documento vem antes do nome
-            r'([A-Z]\d+[-]\w+|Processo\s+[][\d\.\/]+)\s*,?\s*([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s*,?\s*natural\s+d[oa]\s+([A-ZÀ-Ú\s]+)',
-            
-            # Padrão mais simples
-            r'([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s*[-–,]\s*([A-Z]\d+[-]\w+)\s*,?\s*natural\s+d[oa]\s+([A-ZÀ-Ú\s]+)',
-            
-            # Padrão para casos onde o nome vem depois do documento
-            r'([A-Z]\d+[-]\w+)\s*,?\s*([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s*,?\s*natural\s+d[oa]\s+([A-ZÀ-Ú\s]+)',
-            
-            # Padrão para casos onde não há hífen e nem vírgula
-            r'([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s+([A-Z]\d+[-]\w+|Processo\s+[][\d\.\/]+)\s+natural\s+d[oa]\s+([A-ZÀ-Ú\s]+)',
-            
-            # Padrão para casos onde o documento vem antes do nome (sem vírgulas)
-            r'([A-Z]\d+[-]\w+|Processo\s+[][\d\.\/]+)\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]+?)\s+natural\s+d[oa]\s+([A-ZÀ-Ú\s]+)',
-            
-            # Padrão alternativo para nomes com apóstrofo
-            r'([A-ZÀ-Ú][A-ZÀ-Ú\s\']+?)\s*[-–,]\s*([A-Z]\d+[-]\w+|Processo\s+[][\d\.\/]+)\s*,?\s*natural\s+d[oa]\s+([A-ZÀ-Ú\s\']+?)\s*,?\s*nascid[oa]\s+em\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})\s*,?\s*filh[oa]\s+de\s+([A-ZÀ-Ú\s\']+)',
-            
-            # Padrão para nomes com hífen
-            r'([A-ZÀ-Ú][A-ZÀ-Ú\s-]+?)\s*[-–,]\s*([A-Z]\d+[-]\w+|Processo\s+[][\d\.\/]+)\s*,?\s*natural\s+d[oa]\s+([A-ZÀ-Ú\s-]+?)\s*,?\s*nascid[oa]\s+em\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})\s*,?\s*filh[oa]\s+de\s+([A-ZÀ-Ú\s-]+)',
+        ignorados = []
+        palavras_ignorar = {
+            'PORTARIA', 'Nº', 'RESOLVE', 'CONCEDER', 'TORNAR', 'NACIONALIDADE', 
+            'BRASILEIRA', 'NATURALIZAÇÃO', 'PESSOAS', 'RELACIONADAS', 'TERMOS', 'ART',
+            'CONSTITUIÇÃO', 'FEDERAL', 'CONFORMIDADE', 'LEI', 'REGULAMENTADA', 'DECRETO',
+            'COMPARECER', 'JUSTIÇA', 'ELEITORAL', 'CADASTRAMENTO',
+            'COORDENADOR', 'COORDENADORA', 'DIRETOR', 'DIRETORA', 'PRESIDENTE', 'MINISTRO', 'MINISTRA',
+            'SECRETÁRIO', 'SECRETÁRIA', 'DELEGADO', 'DELEGADA', 'CHEFE', 'SUPERINTENDENTE',
+            'PROCURADOR', 'PROCURADORA', 'ADVOGADO', 'ADVOGADA', 'JUIZ', 'JUIZA',
+            'DESEMBARGADOR', 'DESEMBARGADORA', 'PROCESSOS MIGRATÓRIOS', 'POLÍCIA FEDERAL',
+            'MINISTÉRIO DA JUSTIÇA', 'DEPARTAMENTO', 'DIVISÃO', 'SEÇÃO', 'COORDENAÇÃO', 'GERÊNCIA'
+        }
+        expressoes_cargo = [
+            'COORDENADOR', 'COORDENADORA', 'DIRETOR', 'DIRETORA', 'PRESIDENTE', 'MINISTRO', 'MINISTRA',
+            'SECRETÁRIO', 'SECRETÁRIA', 'DELEGADO', 'DELEGADA', 'CHEFE', 'SUPERINTENDENTE',
+            'PROCURADOR', 'PROCURADORA', 'ADVOGADO', 'ADVOGADA', 'JUIZ', 'JUIZA',
+            'DESEMBARGADOR', 'DESEMBARGADORA', 'PROCESSOS MIGRATÓRIOS', 'POLÍCIA FEDERAL',
+            'MINISTÉRIO DA JUSTIÇA', 'DEPARTAMENTO', 'DIVISÃO', 'SEÇÃO', 'COORDENAÇÃO', 'GERÊNCIA'
         ]
-
-        # Tentar cada padrão
-        for pattern in patterns:
-            print(f"Tentando padrão: {pattern}")
-            matches = re.findall(pattern, texto, re.IGNORECASE)
+        palavras_lixo_site = [
+            'ir para o conteúdo', 'acesso rápido', 'órgãos do governo', 'acesso à informação',
+            'legislação', 'acessibilidade', 'mudar para o modo de alto contraste', 'acesso gov.br',
+            'imprensa nacional', 'diário oficial da união', 'publicador de conteúdos', 'voltar',
+            'compartilhe', 'facebook', 'twitter', 'linkedin', 'whatsapp', 'instagram', 'imagem não disponível',
+            'versão certificada', 'diário completo', 'impressão', 'brasão do brasil', 'publicado em:',
+            'edição:', 'seção:', 'página:', 'órgão:', 'caminho de navegação', 'serviços', 'leitura do jornal',
+            'destaques do diário oficial', 'base de dados de publicações', 'verificação de autenticidade',
+            'acesso ao sistema de envio', 'concursos e seleções', 'tutorial', 'termo de uso', 'política de privacidade',
+            'portal da imprensa nacional', 'mega-menu'
+        ]
+        # Se forçar linha por bloco, cada linha é um bloco
+        if forcar_linha_por_bloco:
+            blocos = [b.strip() for b in texto.split('\n') if len(b.strip()) > 5]
+        else:
+            texto = re.sub(r'\)\s*e\s*([A-ZÁÉÍÓÚÃÕÂÊÎÔÛÇ])', r');\1', texto)
+            texto = re.sub(r'\)\s*e\s*$', r');', texto, flags=re.MULTILINE)
+            blocos = re.split(r';|\n\n', texto)
+            blocos = [b.strip() for b in blocos if len(b.strip()) > 5]
+        for bloco in blocos:
+            bloco_lower = bloco.lower()
+            if any(palavra in bloco_lower for palavra in palavras_lixo_site):
+                ignorados.append({'motivo': 'bloco_lixo_site', 'bloco': bloco})
+                continue
+            m_doc = re.search(r'([A-Za-z]+\d+[-][A-Za-z0-9]+|Processo\s+[\d\./]+)', bloco)
+            m_pais = re.search(r'natural\s+d[aeo]\s+([A-Za-zÀ-ú\s\-]+)', bloco, re.IGNORECASE)
+            if not m_doc:
+                ignorados.append({'motivo': 'sem_documento', 'bloco': bloco})
+                continue
+            if not m_pais:
+                ignorados.append({'motivo': 'sem_pais', 'bloco': bloco})
+                continue
+            documento = m_doc.group(1).strip()
+            pais_original = m_pais.group(1).strip()
+            pais = self.normalizar_pais(pais_original)
+            nome = ''
+            nome_match = re.match(r'^\s*(.+?)[\s\-–—,:]+\s*' + re.escape(documento), bloco, re.IGNORECASE)
+            if nome_match:
+                nome = nome_match.group(1).strip()
+            else:
+                nome_match = re.search(r'(.+?)[\s\-–—,:]+\s*' + re.escape(documento), bloco, re.IGNORECASE)
+                if nome_match:
+                    nome = nome_match.group(1).strip()
+                else:
+                    nome_match = re.search(r'(.+?)\s*natural\s+d[aeo]', bloco, re.IGNORECASE)
+                    if nome_match:
+                        nome = nome_match.group(1).strip()
+            if not nome:
+                ignorados.append({'motivo': 'sem_nome', 'bloco': bloco})
+                continue
+            nome = re.sub(r'^\s*(.+?)\s*[-–—,:e\.]?\s*$', r'\1', nome.strip())
             
-            if matches:
-                print(f"✅ Encontradas {len(matches)} pessoas com padrão")
-                
-                for match in matches:
-                    nome = match[0].strip()
-                    documento = match[1].strip()
-                    pais = match[2].strip().upper()
-                    
-                    # Verificar se temos data de nascimento
-                    data_nascimento = match[3].strip() if len(match) > 3 else None
-                    nome_pai = match[4].strip() if len(match) > 4 else None
-                    
-                    # Limpar nome (remover "e" no final se for apenas isso)
-                    if nome.strip() == "e" or nome.strip() == "E":
-                        continue
-                    
-                    # Verificar se é processo ou RNM
-                    tipo_documento = 'PROCESSO' if 'Processo' in documento else 'RNM'
-                    
-                    # Calcular idade se temos data
-                    idade = self.calcular_idade(data_nascimento) if data_nascimento else None
-                    
-                    pessoa = {
-                        'nome': nome,
-                        'documento': documento,
-                        'tipo_documento': tipo_documento,
-                        'pais': pais,
-                        'data_nascimento': data_nascimento,
-                        'nome_pai': nome_pai,
-                        'idade': idade
-                    }
-                    
-                    pessoas.append(pessoa)
-                    print(f"  - {nome} ({pais})")
-                
-                break  # Se encontrou com um padrão, não tenta os outros
-        
-        # Limpar pessoas duplicadas ou com nomes inválidos
-        pessoas_limpas = []
-        nomes_vistos = set()
-        
-        for pessoa in pessoas:
-            nome_limpo = pessoa['nome'].strip()
-            # Remover "e" isolado, nomes muito curtos e nomes que começam com "e"
-            if (nome_limpo and 
-                nome_limpo not in nomes_vistos and 
-                nome_limpo not in ['e', 'E'] and
-                len(nome_limpo) > 2 and
-                not nome_limpo.startswith('e ') and
-                not nome_limpo.startswith('E ')):
-                nomes_vistos.add(nome_limpo)
-                pessoas_limpas.append(pessoa)
-        
-        if not pessoas_limpas:
-            print("❌ Nenhuma pessoa encontrada. Tentando busca manual...")
-            # Busca manual por nomes em maiúscula seguidos de hífen ou vírgula
-            linhas = texto.split('\n')
-            for linha in linhas:
-                if re.search(r'[A-ZÀ-Ú\s]+[-–,]\s*[A-Z]\d+', linha):
-                    print(f"Linha suspeita: {linha[:100]}...")
+            nome_upper = nome.upper().strip()
+            nome_palavras = nome_upper.split()
             
-            # Tentar padrão mais simples: apenas nomes em maiúscula
-            print("Tentando padrão simples de nomes...")
-            nomes_simples = re.findall(r'([A-ZÀ-Ú][A-ZÀ-Ú\s]{2,})', texto)
-            nomes_filtrados = [nome.strip() for nome in nomes_simples if len(nome.strip()) > 3]
-            print(f"Nomes encontrados (simples): {nomes_filtrados[:10]}...")
+            # Verificações mais flexíveis
+            if (
+                nome_upper in palavras_ignorar
+                or (len(nome_palavras) < 2 and any(exp in nome_upper for exp in expressoes_cargo))
+                or nome_upper.startswith('PORTARIA N')
+            ):
+                ignorados.append({'motivo': 'palavra_ignorar', 'nome': nome, 'bloco': bloco})
+                continue
+                
+            m_data = re.search(r'nascid[oa\(a\)]*\s*em\s*(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})', bloco, re.IGNORECASE)
+            if not m_data:
+                m_data = re.search(r'nascid[oa]?\s+em\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})', bloco, re.IGNORECASE)
+            data_nascimento = m_data.group(1).strip() if m_data else ''
+            
+            m_pai = re.search(r'filh[oa\(a\)]*\s+de\s+([A-ZÀ-Úa-zà-ú\s\'\-]+?)(?:\s+e\s+filh[oa\(a\)]*\s+de\s+[A-ZÀ-Úa-zà-ú\s\'\-]+)?', bloco, re.IGNORECASE)
+            nome_pai = m_pai.group(1).strip() if m_pai else ''
+            
+            tipo_documento = 'PROCESSO' if 'Processo' in documento else 'RNM' if documento else ''
+            idade = self.calcular_idade(data_nascimento) if data_nascimento else None
+            
+            pessoa = {
+                'nome': nome,
+                'documento': documento,
+                'tipo_documento': tipo_documento,
+                'pais': pais,
+                'data_nascimento': data_nascimento,
+                'nome_pai': nome_pai,
+                'idade': idade
+            }
+            pessoas.append(pessoa)
+            print(f"  - {nome} ({pais})")
         
-        print(f"Total de pessoas extraídas: {len(pessoas_limpas)}")
-        return pessoas_limpas
+        print(f"Total de pessoas extraídas: {len(pessoas)}")
+        if ignorados:
+            print(f"⚠️ Blocos ignorados: {len(ignorados)}")
+            for ign in ignorados[:5]:
+                print(f"  Ignorado: {ign['motivo']} | {ign.get('nome','')} | {ign['bloco'][:80]}...")
+        return pessoas
     
     def calcular_idade(self, data_nascimento_str):
         """Calcula idade baseada na data de nascimento em formato brasileiro"""
@@ -456,7 +482,8 @@ class PortariaAnalyzer:
                 })
             
             # Verificar país
-            if pessoa['pais'] not in self.paises_oficiais:
+            pais_normalizado = self.normalizar_pais(pessoa['pais'])
+            if pais_normalizado not in self.paises_oficiais:
                 erros.append({
                     'tipo': 'PAIS_INVALIDO',
                     'pessoa': pessoa['nome'],
@@ -704,27 +731,20 @@ class PortariaAnalyzer:
         
         # Aba 1: Resumo
         ws_resumo = wb.active
-        ws_resumo.title = "Resumo"
-        
-        # Cabeçalho do resumo
-        ws_resumo['A1'] = "RELATÓRIO DE ANÁLISE DE PORTARIA"
-        ws_resumo['A1'].font = Font(bold=True, size=14)
-        
-        ws_resumo['A3'] = "Número da Portaria:"
-        ws_resumo['B3'] = dados_portaria['numero'] if dados_portaria else "N/A"
-        
-        ws_resumo['A4'] = "Data:"
-        ws_resumo['B4'] = dados_portaria['data'] if dados_portaria else "N/A"
-        
-        ws_resumo['A5'] = "Tipo de Naturalização:"
-        ws_resumo['B5'] = dados_portaria['tipo'] if dados_portaria else "N/A"
-        
-        ws_resumo['A6'] = "Total de Pessoas:"
-        ws_resumo['B6'] = len(dados_portaria['pessoas']) if dados_portaria else 0
-        
-        ws_resumo['A7'] = "Total de Erros:"
-        ws_resumo['B7'] = len(erros)
-        
+        if ws_resumo is not None:
+            ws_resumo.title = "Resumo"
+            ws_resumo['A1'] = "RELATÓRIO DE ANÁLISE DE PORTARIA"
+            ws_resumo['A1'].font = Font(bold=True, size=14)
+            ws_resumo['A3'] = "Número da Portaria:"
+            ws_resumo['B3'] = dados_portaria.get('numero', 'N/A') if dados_portaria else "N/A"
+            ws_resumo['A4'] = "Data:"
+            ws_resumo['B4'] = dados_portaria.get('data', 'N/A') if dados_portaria else "N/A"
+            ws_resumo['A5'] = "Tipo de Naturalização:"
+            ws_resumo['B5'] = dados_portaria.get('tipo', 'N/A') if dados_portaria else "N/A"
+            ws_resumo['A6'] = "Total de Pessoas:"
+            ws_resumo['B6'] = len(dados_portaria.get('pessoas', [])) if dados_portaria else 0
+            ws_resumo['A7'] = "Total de Erros:"
+            ws_resumo['B7'] = len(erros)
         # Aba 2: Erros Detalhados
         ws_erros = wb.create_sheet(title="Erros")
         
@@ -744,23 +764,21 @@ class PortariaAnalyzer:
             ws_erros.cell(row=row, column=5, value=erro['descrição'])
         
         # Aba 3: Pessoas da Portaria
-        if dados_portaria and dados_portaria['pessoas']:
+        if dados_portaria and dados_portaria.get('pessoas'):
             ws_pessoas = wb.create_sheet(title="Pessoas")
-            
             headers_pessoas = ['Nome', 'Documento', 'Tipo Doc', 'País', 'Data Nascimento', 'Idade', 'Nome do Pai']
             for col, header in enumerate(headers_pessoas, 1):
                 cell = ws_pessoas.cell(row=1, column=col, value=header)
                 cell.font = Font(bold=True)
                 cell.fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
-            
-            for row, pessoa in enumerate(dados_portaria['pessoas'], 2):
-                ws_pessoas.cell(row=row, column=1, value=pessoa['nome'])
-                ws_pessoas.cell(row=row, column=2, value=pessoa['documento'])
-                ws_pessoas.cell(row=row, column=3, value=pessoa['tipo_documento'])
-                ws_pessoas.cell(row=row, column=4, value=pessoa['pais'])
-                ws_pessoas.cell(row=row, column=5, value=pessoa['data_nascimento'])
-                ws_pessoas.cell(row=row, column=6, value=pessoa['idade'])
-                ws_pessoas.cell(row=row, column=7, value=pessoa['nome_pai'])
+            for row, pessoa in enumerate(dados_portaria.get('pessoas', []), 2):
+                ws_pessoas.cell(row=row, column=1, value=pessoa.get('nome', ''))
+                ws_pessoas.cell(row=row, column=2, value=pessoa.get('documento', ''))
+                ws_pessoas.cell(row=row, column=3, value=pessoa.get('tipo_documento', ''))
+                ws_pessoas.cell(row=row, column=4, value=pessoa.get('pais', ''))
+                ws_pessoas.cell(row=row, column=5, value=pessoa.get('data_nascimento', ''))
+                ws_pessoas.cell(row=row, column=6, value=pessoa.get('idade', ''))
+                ws_pessoas.cell(row=row, column=7, value=pessoa.get('nome_pai', ''))
         
         # Salvar arquivo
         wb.save(nome_arquivo)
@@ -786,11 +804,22 @@ class PortariaAnalyzer:
         if not html_content:
             return {'erro': 'Não foi possível acessar a portaria'}
         
-        # 2. Extrair texto do HTML
+        # 2. Extrair texto dos parágrafos HTML corretamente
         soup = BeautifulSoup(html_content, 'html.parser')
-        texto_completo = soup.get_text()
         
-        # 3. Analisar múltiplas portarias se houver
+        # Encontrar a div com class="texto-dou" que contém todas as portarias
+        div_texto = soup.find('div', class_='texto-dou')
+        if div_texto:
+            # Extrair apenas os parágrafos da div texto-dou
+            paragrafos = div_texto.find_all('p')
+            texto_completo = '\n'.join([p.get_text().strip() for p in paragrafos])
+        else:
+            # Fallback: usar o método anterior
+            texto_completo = soup.get_text()
+        
+        print(f"Texto extraído dos parágrafos: {len(texto_completo)} caracteres")
+        
+        # 3. Analisar múltiplas portarias
         resultados, arquivos_excel = self.analisar_multiplas_portarias(texto_completo, gerar_excel)
         
         # 4. Retornar resultado consolidado
@@ -873,133 +902,126 @@ class PortariaAnalyzer:
         numero_formatado = format(numero_int, ',').replace(',', '.')
         return f"Nº {numero_formatado}".upper()
 
-    def extrair_dados_portaria_direto(self, texto_portaria):
+    def extrair_dados_portaria_direto(self, texto_portaria, forcar_linha_por_bloco=False):
         """
         Extrai dados estruturados da portaria a partir do texto direto
-        
         Args:
             texto_portaria (str): Texto da portaria
-            
+            forcar_linha_por_bloco (bool): Se True, cada linha é um bloco de pessoa
         Returns:
             dict: Dados estruturados da portaria
         """
         print("Extraindo dados da portaria...")
-        
         if not texto_portaria:
             print("❌ Texto da portaria vazio")
             return None
-        
-        # Primeiro, encontrar o número e data da portaria
+        texto_completo = texto_portaria
+        print(f"Texto extraído: {len(texto_completo)} caracteres")
+        print(f"Início do texto: {texto_completo[:500]}...")
+        patterns_portaria = [
+            r'PORTARIA\s*,?\s*Nº\s*(\d+[\.,]?\d*)\s*,?\s*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})',
+            r'PORTARIA\s*Nº\s*(\d+[\.,]?\d*)[,,\s]*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})',
+            r'PORTARIA\s*(\d+[\.,]?\d*)[,,\s]*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})',
+            r'PORTARIA\s*Nº\s*(\d+[\.,]?\d*)',
+        ]
         match_portaria = None
-        
-        # Tentar encontrar o padrão principal
-        padrao_principal = r'PORTARIA\s*N[º°]?\s*(\d+[.,]?\d*)[\s,]*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})'
-        match = re.search(padrao_principal, texto_portaria, re.IGNORECASE)
-        if match:
-            match_portaria = match
-        
-        # Se não encontrou, tentar padrões alternativos
-        if not match_portaria:
-            padrao_alternativo = r'PORTARIA\s*(\d+[.,]?\d*)[\s,]*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})'
-            match = re.search(padrao_alternativo, texto_portaria, re.IGNORECASE)
+        for i, pattern in enumerate(patterns_portaria):
+            print(f"Tentando padrão {i+1}: {pattern}")
+            match = re.search(pattern, texto_completo, re.IGNORECASE)
             if match:
                 match_portaria = match
-        
+                print(f"✅ Padrão {i+1} encontrou match: {match.groups()}")
+                break
         if not match_portaria:
             print("❌ Nenhum padrão de portaria encontrado")
-            return None
-        
-        numero_portaria = match_portaria.group(1)
-        data_portaria = match_portaria.group(2)
-        
-        print(f"✅ Portaria encontrada: {numero_portaria} de {data_portaria}")
-        
-        # Identificar tipo de naturalização
-        tipo_naturalizacao = self.identificar_tipo_naturalizacao(texto_portaria)
+            print("Debug: Procurando por 'PORTARIA' no texto...")
+            if 'PORTARIA' in texto_completo.upper():
+                print("✅ 'PORTARIA' encontrada no texto")
+                match_numero = re.search(r'PORTARIA\s*[NnNº°]?\s*(\d+)', texto_completo, re.IGNORECASE)
+                if match_numero:
+                    numero_portaria = match_numero.group(1)
+                    data_portaria = "Data não encontrada"
+                    print(f"✅ Número extraído: {numero_portaria}")
+                else:
+                    return None
+            else:
+                print("❌ 'PORTARIA' não encontrada no texto")
+                return None
+        else:
+            numero_portaria = match_portaria.group(1)
+            data_portaria = match_portaria.group(2)
+        numero_formatado = self.formatar_numero_portaria(numero_portaria)
+        print(f"✅ Portaria encontrada: PORTARIA {numero_formatado}, DE {data_portaria}")
+        tipo_naturalizacao = self.identificar_tipo_naturalizacao(texto_completo)
         print(f"✅ Tipo identificado: {tipo_naturalizacao}")
-        
-        # Extrair pessoas
-        pessoas = self.extrair_pessoas(texto_portaria)
+        pessoas = self.extrair_pessoas(texto_completo, forcar_linha_por_bloco=forcar_linha_por_bloco)
         print(f"✅ Pessoas extraídas: {len(pessoas)}")
-        
         return {
-            'numero': numero_portaria,
+            'numero': numero_formatado,
             'data': data_portaria,
             'tipo': tipo_naturalizacao,
             'pessoas': pessoas,
-            'texto_completo': texto_portaria
+            'texto_completo': texto_completo
         }
 
     def analisar_multiplas_portarias(self, texto_completo, gerar_excel=True):
         """
         Analisa múltiplas portarias em um texto único, separando cada portaria e identificando o tipo corretamente.
         """
-        # Regex para separar portarias de forma mais precisa
-        # Captura desde PORTARIA até o início de uma nova portaria ou fim do texto
-        # Adiciona verificação para não capturar referências à portaria 623
-        padrao_portaria = r'(PORTARIA\s*,?\s*Nº\s*(\d+[.,]?\d*)\s*,?\s*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})[\s\S]*?(?=PORTARIA\s*,?\s*Nº\s*(\d+[.,]?\d*)\s*,?\s*DE\s*(\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4})|$))'
-        
-        # Encontrar todas as posições onde começam portarias
-        matches = list(re.finditer(padrao_portaria, texto_completo))
-        
-        if not matches:
-            print("Nenhuma portaria encontrada no texto")
-            print("Debug: Primeiros 500 caracteres do texto:")
-            print(texto_completo[:500])
-            return [], []
-        
-        print(f"Encontradas {len(matches)} portarias no texto")
-        
-        # Extrair os blocos completos usando os matches
-        blocos = [match.group(1) for match in matches]  # Usar group(1) para pegar o bloco completo
-        
-        # Lista para rastrear todas as pessoas do documento
+        # Padrão flexível para portarias de naturalização: PORTARIA N[º°] [número], DE [data]
+        padrao_portaria = r'(PORTARIA\s*N[º°]?\s*\d+[\.,]?\d*\s*,\s*DE\s*\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4}[\s\S]*?)(?=PORTARIA\s*N[º°]?\s*\d+[\.,]?\d*\s*,\s*DE\s*\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4}|$)'
+        blocos = re.findall(padrao_portaria, texto_completo, flags=re.IGNORECASE)
+        blocos = [b.strip() for b in blocos if b.strip()]
+        if not blocos:
+            print("Nenhuma portaria de naturalização encontrada com o padrão específico.")
+            # Fallback para o caso de ter apenas uma portaria colada sem o cabeçalho completo do DOU
+            dados_portaria = self.extrair_dados_portaria_direto(texto_completo)
+            if not dados_portaria or not dados_portaria.get('pessoas'):
+                print("Não foi possível extrair dados ou pessoas da portaria única.")
+                return [], []
+            print("Analisando como portaria única (fallback).")
+            erros = self.verificar_erros(dados_portaria)
+            arquivo_excel = None
+            if gerar_excel:
+                arquivo_excel = self.gerar_relatorio_excel(dados_portaria, erros)
+            return [{
+                'dados_portaria': dados_portaria,
+                'erros': erros,
+                'arquivo_excel': arquivo_excel,
+                'total_erros': len(erros)
+            }], [arquivo_excel] if arquivo_excel else []
+        print(f"Encontradas {len(blocos)} portarias de naturalização para análise.")
         todas_pessoas_documento = []
         resultados = []
         arquivos_excel = []
-        
         for i, bloco in enumerate(blocos, 1):
             print(f"\n==============================")
             print(f"Analisando PORTARIA {i}...")
             print(f"Tamanho do bloco: {len(bloco)} caracteres")
             print(f"Primeiros 200 caracteres: {bloco[:200]}...")
-            
-            dados_portaria = self.extrair_dados_portaria_direto(bloco)
+            dados_portaria = self.extrair_dados_portaria_direto(bloco, forcar_linha_por_bloco=True)
             if not dados_portaria:
                 print(f"❌ Não foi possível extrair dados da portaria {i}")
                 continue
-                
-            # Verificar se a portaria tem pessoas antes de processar
-            if not dados_portaria.get('pessoas') or len(dados_portaria['pessoas']) == 0:
-                print(f"⚠️  Portaria {i} não tem pessoas, pulando...")
-                continue
-                
             erros = self.verificar_erros(dados_portaria)
-            
-            # Verificar duplicatas entre portarias do mesmo documento
             erros_duplicatas = self.verificar_duplicatas_entre_portarias(dados_portaria, todas_pessoas_documento)
             erros.extend(erros_duplicatas)
-            
-            # Adicionar pessoas desta portaria à lista geral
             for pessoa in dados_portaria['pessoas']:
                 todas_pessoas_documento.append({
                     'nome': pessoa['nome'],
                     'data_nascimento': pessoa['data_nascimento'],
                     'portaria_origem': dados_portaria['numero']
                 })
-            
             arquivo_excel = None
             if gerar_excel:
                 arquivo_excel = self.gerar_relatorio_excel(dados_portaria, erros)
                 arquivos_excel.append(arquivo_excel)
-            
             resultados.append({
                 'dados_portaria': dados_portaria,
                 'erros': erros,
                 'arquivo_excel': arquivo_excel,
                 'total_erros': len(erros)
             })
-        
         return resultados, arquivos_excel
 
     def verificar_duplicatas_entre_portarias(self, dados_portaria_atual, todas_pessoas_documento):
@@ -1025,6 +1047,42 @@ class PortariaAnalyzer:
                     break  # Só precisa encontrar uma duplicata
         
         return erros
+
+    def normalizar_pais(self, pais_str):
+        """Normaliza o nome do país para corresponder aos nomes oficiais"""
+        if not pais_str:
+            return None
+            
+        # Remover palavras extras como "NASCIDO", "NASCIDA", etc.
+        pais_limpo = re.sub(r'\s+(NASCIDO|NASCIDA|NATURAL|DE|DA|DO)\s*$', '', pais_str.strip(), flags=re.IGNORECASE)
+        
+        # Mapeamentos específicos
+        mapeamentos = {
+            'ARGENTINA NASCIDO': 'ARGENTINA',
+            'VENEZUELA NASCIDO': 'VENEZUELA',
+            'EGITO NASCIDO': 'EGITO',
+            'URUGUAI NASCIDO': 'URUGUAI',
+            'LIBANO': 'LÍBANO',
+            'NIGERIA': 'NIGÉRIA',
+            'SIRIA': 'SÍRIA',
+            'FEDERAÇÃO DA RÚSSIA': 'RÚSSIA',
+            'FRANÇA METROPOLITANA': 'FRANÇA'
+        }
+        
+        # Verificar mapeamentos
+        if pais_limpo.upper() in mapeamentos:
+            return mapeamentos[pais_limpo.upper()]
+        
+        # Verificar se está na lista oficial
+        if pais_limpo.upper() in self.paises_oficiais:
+            return pais_limpo.upper()
+        
+        # Tentar encontrar correspondência aproximada
+        for pais_oficial in self.paises_oficiais:
+            if pais_limpo.upper() == pais_oficial.upper():
+                return pais_oficial
+        
+        return pais_limpo.upper()  # Retornar como está se não encontrar correspondência
 
 # Exemplo de uso - versão melhorada com diagnósticos
 def main():
@@ -1098,16 +1156,17 @@ def main():
                 todas_pessoas = []
                 
                 for idx, res in enumerate(resultado['resultados'], 1):
-                    if res['dados_portaria']:
-                        dados = res['dados_portaria']
-                        todas_pessoas.extend(dados['pessoas'])
-                        
+                    dados = res.get('dados_portaria') if isinstance(res, dict) else None
+                    if dados:
+                        todas_pessoas.extend(dados.get('pessoas', []))
                         # Adicionar informações da portaria aos erros
-                        for erro in res['erros']:
-                            erro_completo = erro.copy()
-                            erro_completo['portaria'] = dados['numero']
-                            erro_completo['tipo_portaria'] = dados['tipo']
-                            todos_erros.append(erro_completo)
+                        erros_res = res.get('erros') if isinstance(res, dict) else None
+                        if erros_res:
+                            for erro in erros_res:
+                                erro_completo = erro.copy() if isinstance(erro, dict) else {}
+                                erro_completo['portaria'] = dados.get('numero', 'N/A')
+                                erro_completo['tipo_portaria'] = dados.get('tipo', 'N/A')
+                                todos_erros.append(erro_completo)
                 
                 # Mostrar resumo consolidado
                 print(f"\n{'='*80}")
@@ -1273,5 +1332,5 @@ def main():
     print("\n" + "="*60)
     input("Pressione Enter para finalizar...")
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    app.run(debug=True, host='192.168.1.10', port=9000)
