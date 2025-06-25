@@ -131,6 +131,17 @@ def analisar():
                     'message': 'Texto da portaria é obrigatório'
                 })
             
+            # Salvar o texto recebido em um arquivo para debug
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_filename = f"debug_texto_recebido_{timestamp}.txt"
+            
+            with open(log_filename, 'w', encoding='utf-8') as f:
+                f.write("=== TEXTO RECEBIDO DO FORMULARIO ===\n")
+                f.write(texto_portaria)
+                f.write("\n=== FIM DO TEXTO ===\n")
+            
+            print(f"Texto salvo em: {log_filename}")
+            
             try:
                 resultados, arquivos_excel = analyzer.analisar_multiplas_portarias(texto_portaria, gerar_excel=True)
                 

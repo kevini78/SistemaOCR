@@ -493,11 +493,13 @@
                                 <div class="pessoas-grid">`;
                             p.pessoas.forEach(function(pessoa) {
                                 html += `<div class="pessoa-item">
-                                    <strong>${pessoa.nome}</strong>
-                                    <small>Documento: ${pessoa.documento} (${pessoa.tipo_documento})</small>
-                                    <small>País: ${pessoa.pais}</small>`;
-                                if(pessoa.idade) html += `<small>Idade: ${pessoa.idade} anos</small>`;
-                                if(pessoa.data_nascimento) html += `<small>Nascimento: ${pessoa.data_nascimento}</small>`;
+                                    <strong>👤 ${pessoa.nome}</strong>
+                                    <small>🆔 Documento: ${pessoa.documento} (${pessoa.tipo_documento})</small>`;
+                                if(pessoa.processo) html += `<small>📋 Processo: ${pessoa.processo}</small>`;
+                                html += `<small>🌍 País: ${pessoa.pais}</small>`;
+                                if(pessoa.estado) html += `<small>🏛️ Estado: ${pessoa.estado}</small>`;
+                                if(pessoa.idade) html += `<small>🎂 Idade: ${pessoa.idade} anos</small>`;
+                                if(pessoa.data_nascimento) html += `<small>📅 Nascimento: ${pessoa.data_nascimento}</small>`;
                                 html += `</div>`;
                             });
                             html += `</div></div>`;

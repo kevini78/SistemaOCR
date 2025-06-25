@@ -11,6 +11,7 @@ import time
 import os
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
+import unicodedata
 
 class PortariaAnalyzer:
     def __init__(self, planilha_historico_path=None):
@@ -23,15 +24,27 @@ class PortariaAnalyzer:
         self.planilha_historico_path = planilha_historico_path
         self.historico_df = None
         self.erros_encontrados = []
-        self.paises_oficiais = self.carregar_paises_oficiais()
-        
-        # Carregar histórico se fornecido
-        if planilha_historico_path and os.path.exists(planilha_historico_path):
-            self.carregar_historico()
+        self.paises_oficiais = set()
+        self.estados_oficiais = [
+            'Acre', 'Alagoas', 'Amapá', 'Amazonas', 'Bahia', 'Ceará', 'Distrito Federal', 'Espírito Santo',
+            'Goiás', 'Maranhão', 'Mato Grosso', 'Mato Grosso do Sul', 'Minas Gerais', 'Pará', 'Paraíba',
+            'Paraná', 'Pernambuco', 'Piauí', 'Rio de Janeiro', 'Rio Grande do Norte', 'Rio Grande do Sul',
+            'Rondônia', 'Roraima', 'Santa Catarina', 'São Paulo', 'Sergipe', 'Tocantins'
+        ]
+        self.estados_brasil = [
+            'ACRE', 'ALAGOAS', 'AMAPÁ', 'AMAPA', 'AMAZONAS', 'BAHIA', 'CEARÁ', 'CEARA', 'DISTRITO FEDERAL',
+            'ESPÍRITO SANTO', 'ESPIRITO SANTO', 'GOIÁS', 'GOIAS', 'MARANHÃO', 'MARANHAO', 'MATO GROSSO',
+            'MATO GROSSO DO SUL', 'MINAS GERAIS', 'PARÁ', 'PARA', 'PARAÍBA', 'PARAIBA', 'PARANÁ', 'PARANA',
+            'PERNAMBUCO', 'PIAUÍ', 'PIAUI', 'RIO DE JANEIRO', 'RIO GRANDE DO NORTE', 'RIO GRANDE DO SUL',
+            'RONDÔNIA', 'RONDONIA', 'RORAIMA', 'SANTA CATARINA', 'SÃO PAULO', 'SAO PAULO', 'SERGIPE', 'TOCANTINS'
+        ]
+        self.carregar_paises_oficiais()
+        if planilha_historico_path:
+            self.carregar_historico(planilha_historico_path)
     
     def carregar_paises_oficiais(self):
         """Carrega lista de países oficiais"""
-        return {
+        self.paises_oficiais = {
             'AFEGANISTÃO', 'ÁFRICA DO SUL', 'ALBÂNIA', 'ALEMANHA', 'ANDORRA', 'ANGOLA', 
             'ANTÍGUA E BARBUDA', 'ARÁBIA SAUDITA', 'ARGÉLIA', 'ARGENTINA', 'ARMÊNIA', 
             'AUSTRÁLIA', 'ÁUSTRIA', 'AZERBAIJÃO', 'BAHAMAS', 'BAHREIN', 'BANGLADESH', 
@@ -66,10 +79,10 @@ class PortariaAnalyzer:
             'VATICANO', 'VENEZUELA', 'VIETNÃ', 'ZÂMBIA', 'ZIMBÁBUE'
         }
     
-    def carregar_historico(self):
+    def carregar_historico(self, planilha_historico_path):
         """Carrega a planilha com histórico de naturalizações"""
         try:
-            self.historico_df = pd.read_excel(self.planilha_historico_path)
+            self.historico_df = pd.read_excel(planilha_historico_path)
             print(f"Histórico carregado: {len(self.historico_df)} registros")
         except Exception as e:
             print(f"Erro ao carregar histórico: {e}")
@@ -243,30 +256,49 @@ class PortariaAnalyzer:
     
     def identificar_tipo_naturalizacao(self, texto):
         """Identifica o tipo de naturalização baseado no artigo e texto da portaria"""
-        texto_lower = texto.lower()
-        # 1. Provisória tem prioridade máxima
-        if 'naturalização provisória' in texto_lower:
+        # Normalizar texto: remover acentos e converter para minúsculas
+        import unicodedata
+        
+        # Normalizar caracteres especiais (ç -> c, ã -> a, etc.)
+        texto_normalizado = unicodedata.normalize('NFD', texto)
+        texto_normalizado = ''.join(c for c in texto_normalizado if not unicodedata.combining(c))
+        texto_lower = texto_normalizado.lower()
+        
+        # 1. Provisória tem prioridade máxima - verificar várias variações
+        if any(termo in texto_lower for termo in ['naturalizacao provisoria', 'naturalização provisória', 'naturalizacao provisória', 'naturalização provisoria']):
             return 'PROVISORIA'
+        
         # 2. Definitiva só se não houver provisória
         if ('tornar definitiva' in texto_lower and 'art. 70' in texto_lower) or \
-           ('tornar definitiva' in texto_lower and 'parágrafo único' in texto_lower):
+           ('tornar definitiva' in texto_lower and 'paragrafo unico' in texto_lower):
             return 'DEFINITIVA'
-        # 3. Provisória (art. 70)
-        if 'art. 70' in texto_lower and 'naturalização provisória' in texto_lower:
+        
+        # 3. Provisória (art. 70) - verificar se tem art. 70 E provisória
+        if 'art. 70' in texto_lower and any(termo in texto_lower for termo in ['provisoria', 'provisória']):
             return 'PROVISORIA'
+        
         # 4. Ordinária (art. 65) tem prioridade sobre extraordinária
         if 'art. 65' in texto_lower:
+            print(f"[DEBUG] Encontrou 'art. 65' no texto")
             return 'ORDINARIA'
+        
         # 5. Extraordinária (art. 67) só se não houver art. 65 ou art. 70
         if 'art. 67' in texto_lower and 'art. 65' not in texto_lower and 'art. 70' not in texto_lower:
+            print(f"[DEBUG] Encontrou 'art. 67' no texto")
             return 'EXTRAORDINARIA'
+        
         # 6. Fallbacks por contexto
         if 'tornar definitiva' in texto_lower:
+            print(f"[DEBUG] Fallback: encontrou 'tornar definitiva' no texto")
             return 'DEFINITIVA'
-        if 'extraordinária' in texto_lower:
+        if 'extraordinaria' in texto_lower or 'extraordinária' in texto_lower:
+            print(f"[DEBUG] Fallback: encontrou 'extraordinária' no texto")
             return 'EXTRAORDINARIA'
-        if 'ordinária' in texto_lower or 'por naturalização' in texto_lower:
+        if 'ordinaria' in texto_lower or 'ordinária' in texto_lower or 'por naturalizacao' in texto_lower:
+            print(f"[DEBUG] Fallback: encontrou 'ordinária' ou 'por naturalização' no texto")
             return 'ORDINARIA'
+        
+        print(f"[DEBUG] Nenhum tipo identificado, retornando DESCONHECIDO")
         return 'DESCONHECIDO'
     
     def extrair_pessoas(self, texto, forcar_linha_por_bloco=False):
@@ -343,10 +375,8 @@ class PortariaAnalyzer:
                 ignorados.append({'motivo': 'sem_nome', 'bloco': bloco})
                 continue
             nome = re.sub(r'^\s*(.+?)\s*[-–—,:e\.]?\s*$', r'\1', nome.strip())
-            
             nome_upper = nome.upper().strip()
             nome_palavras = nome_upper.split()
-            
             # Verificações mais flexíveis
             if (
                 nome_upper in palavras_ignorar
@@ -355,30 +385,46 @@ class PortariaAnalyzer:
             ):
                 ignorados.append({'motivo': 'palavra_ignorar', 'nome': nome, 'bloco': bloco})
                 continue
-                
             m_data = re.search(r'nascid[oa\(a\)]*\s*em\s*(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})', bloco, re.IGNORECASE)
             if not m_data:
                 m_data = re.search(r'nascid[oa]?\s+em\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})', bloco, re.IGNORECASE)
             data_nascimento = m_data.group(1).strip() if m_data else ''
-            
             m_pai = re.search(r'filh[oa\(a\)]*\s+de\s+([A-ZÀ-Úa-zà-ú\s\'\-]+?)(?:\s+e\s+filh[oa\(a\)]*\s+de\s+[A-ZÀ-Úa-zà-ú\s\'\-]+)?', bloco, re.IGNORECASE)
             nome_pai = m_pai.group(1).strip() if m_pai else ''
             
-            tipo_documento = 'PROCESSO' if 'Processo' in documento else 'RNM' if documento else ''
+            # Extrair documento (RNM, etc.)
+            m_doc = re.search(r'([A-Za-z]\d{6,}-[A-Za-z0-9])', bloco)
+            documento = m_doc.group(1).strip() if m_doc else ''
+            tipo_documento = 'RNM' if documento else ''
+            
+            # Extrair processo
+            m_processo = re.search(r'Processo\s*(n[ºo]\s*)?(\d{6,}\.[\d/]+)', bloco, re.IGNORECASE)
+            processo = m_processo.group(2).strip() if m_processo else ''
+            
             idade = self.calcular_idade(data_nascimento) if data_nascimento else None
+            
+            # Extrair estado brasileiro (mais flexível)
+            m_estado = re.search(r'residente no estado [dodaas]{0,3}\s*([A-Za-zÀ-ú\s]+)', bloco, re.IGNORECASE)
+            if not m_estado:
+                m_estado = re.search(r'residente no Estado [dodaas]{0,3}\s*([A-Za-zÀ-ú\s]+)', bloco, re.IGNORECASE)
+            estado = m_estado.group(1).strip() if m_estado else ''
+            
+            # Limpar "e " ou "E " do início, se houver
+            estado = re.sub(r'^e\s+', '', estado, flags=re.IGNORECASE)
             
             pessoa = {
                 'nome': nome,
                 'documento': documento,
                 'tipo_documento': tipo_documento,
+                'processo': processo,
                 'pais': pais,
                 'data_nascimento': data_nascimento,
                 'nome_pai': nome_pai,
-                'idade': idade
+                'idade': idade,
+                'estado': estado
             }
             pessoas.append(pessoa)
-            print(f"  - {nome} ({pais})")
-        
+            print(f"  - {nome} ({pais}) | Processo: {processo} | Estado: {estado}")
         print(f"Total de pessoas extraídas: {len(pessoas)}")
         if ignorados:
             print(f"⚠️ Blocos ignorados: {len(ignorados)}")
@@ -491,6 +537,16 @@ class PortariaAnalyzer:
                     'descrição': f'País não reconhecido: {pessoa["pais"]} para {pessoa["nome"]}'
                 })
             
+            # Verificar estado brasileiro
+            estado_normalizado = unicodedata.normalize('NFKD', pessoa.get('estado', '')).encode('ASCII', 'ignore').decode('ASCII').upper().strip()
+            if pessoa.get('estado') and estado_normalizado not in self.estados_brasil:
+                erros.append({
+                    'tipo': 'ESTADO_INVALIDO',
+                    'pessoa': pessoa['nome'],
+                    'estado': pessoa['estado'],
+                    'descrição': f'Estado brasileiro não reconhecido: {pessoa["estado"]} para {pessoa["nome"]}'
+                })
+            
             # Verificar histórico de naturalizações anteriores
             if self.historico_df is not None:
                 print(f"\n🔍 Verificando histórico para {pessoa['nome']}...")
@@ -520,6 +576,58 @@ class PortariaAnalyzer:
                 # Se não foi publicado anteriormente, não adiciona nada
             else:
                 print(f"⚠️  Histórico não disponível para verificar {pessoa['nome']}")
+        
+        # NOVAS REGRAS DE ALERTA - APENAS PARA EXIBIÇÃO DE ERROS
+        print("\n🔍 Verificando regras adicionais de validação...")
+        for pessoa in pessoas:
+            # 1. Alerta se processo ausente
+            if not pessoa.get('processo'):
+                erros.append({
+                    'tipo': 'ALERTA_PROCESSO_AUSENTE',
+                    'pessoa': pessoa['nome'],
+                    'descrição': 'Processo ausente para esta pessoa'
+                })
+            
+            # 2. Alerta se estado ausente
+            if not pessoa.get('estado'):
+                erros.append({
+                    'tipo': 'ALERTA_ESTADO_AUSENTE',
+                    'pessoa': pessoa['nome'],
+                    'descrição': 'Estado ausente para esta pessoa'
+                })
+            
+            # 3. Alerta se RNM sem dígito verificador
+            if pessoa['tipo_documento'] == 'RNM':
+                if not re.match(r'^[A-Z]\d{6,}-[A-Z0-9]$', pessoa['documento']):
+                    erros.append({
+                        'tipo': 'ALERTA_RNM_SEM_DIGITO_VERIFICADOR',
+                        'pessoa': pessoa['nome'],
+                        'descrição': f'RNM sem dígito verificador: {pessoa["documento"]}'
+                    })
+            
+            # 4. Alerta se falta RNM nos tipos ordinária e extraordinária
+            if tipo in ['ORDINARIA', 'EXTRAORDINARIA'] and pessoa['tipo_documento'] != 'RNM':
+                erros.append({
+                    'tipo': 'ALERTA_FALTA_RNM_ORDINARIA_EXTRAORDINARIA',
+                    'pessoa': pessoa['nome'],
+                    'descrição': f'Pessoa do tipo {tipo} sem RNM: {pessoa["documento"]}'
+                })
+            
+            # 5. Alerta se falta país de nascimento
+            if not pessoa['pais'] or not pessoa['pais'].strip():
+                erros.append({
+                    'tipo': 'ALERTA_FALTA_PAIS_NASCIMENTO',
+                    'pessoa': pessoa['nome'],
+                    'descrição': 'País de nascimento ausente'
+                })
+            
+            # 6. Alerta se falta data de nascimento
+            if not pessoa['data_nascimento'] or not pessoa['data_nascimento'].strip():
+                erros.append({
+                    'tipo': 'ALERTA_FALTA_DATA_NASCIMENTO',
+                    'pessoa': pessoa['nome'],
+                    'descrição': 'Data de nascimento ausente'
+                })
         
         return erros
     
@@ -766,7 +874,7 @@ class PortariaAnalyzer:
         # Aba 3: Pessoas da Portaria
         if dados_portaria and dados_portaria.get('pessoas'):
             ws_pessoas = wb.create_sheet(title="Pessoas")
-            headers_pessoas = ['Nome', 'Documento', 'Tipo Doc', 'País', 'Data Nascimento', 'Idade', 'Nome do Pai']
+            headers_pessoas = ['Nome', 'Documento', 'Tipo Doc', 'Processo', 'País', 'Data Nascimento', 'Idade', 'Nome do Pai', 'Estado']
             for col, header in enumerate(headers_pessoas, 1):
                 cell = ws_pessoas.cell(row=1, column=col, value=header)
                 cell.font = Font(bold=True)
@@ -775,10 +883,12 @@ class PortariaAnalyzer:
                 ws_pessoas.cell(row=row, column=1, value=pessoa.get('nome', ''))
                 ws_pessoas.cell(row=row, column=2, value=pessoa.get('documento', ''))
                 ws_pessoas.cell(row=row, column=3, value=pessoa.get('tipo_documento', ''))
-                ws_pessoas.cell(row=row, column=4, value=pessoa.get('pais', ''))
-                ws_pessoas.cell(row=row, column=5, value=pessoa.get('data_nascimento', ''))
-                ws_pessoas.cell(row=row, column=6, value=pessoa.get('idade', ''))
-                ws_pessoas.cell(row=row, column=7, value=pessoa.get('nome_pai', ''))
+                ws_pessoas.cell(row=row, column=4, value=pessoa.get('processo', ''))
+                ws_pessoas.cell(row=row, column=5, value=pessoa.get('pais', ''))
+                ws_pessoas.cell(row=row, column=6, value=pessoa.get('data_nascimento', ''))
+                ws_pessoas.cell(row=row, column=7, value=pessoa.get('idade', ''))
+                ws_pessoas.cell(row=row, column=8, value=pessoa.get('nome_pai', ''))
+                ws_pessoas.cell(row=row, column=9, value=pessoa.get('estado', ''))
         
         # Salvar arquivo
         wb.save(nome_arquivo)
@@ -968,10 +1078,16 @@ class PortariaAnalyzer:
         """
         Analisa múltiplas portarias em um texto único, separando cada portaria e identificando o tipo corretamente.
         """
-        # Padrão flexível para portarias de naturalização: PORTARIA N[º°] [número], DE [data]
-        padrao_portaria = r'(PORTARIA\s*N[º°]?\s*\d+[\.,]?\d*\s*,\s*DE\s*\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4}[\s\S]*?)(?=PORTARIA\s*N[º°]?\s*\d+[\.,]?\d*\s*,\s*DE\s*\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4}|$)'
+        # Padrão flexível para portarias de naturalização: PORTARIA[,] N[º°] [número], DE [data]
+        # Corrigido para aceitar vírgula antes do Nº
+        padrao_portaria = r'(PORTARIA\s*,?\s*N[º°]?\s*\d+[\.,]?\d*\s*,\s*DE\s*\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4}[\s\S]*?)(?=PORTARIA\s*,?\s*N[º°]?\s*\d+[\.,]?\d*\s*,\s*DE\s*\d{1,2}\s+DE\s+\w+\s+DE\s+\d{4}|$)'
         blocos = re.findall(padrao_portaria, texto_completo, flags=re.IGNORECASE)
         blocos = [b.strip() for b in blocos if b.strip()]
+        
+        print(f"Regex encontrou {len(blocos)} blocos de portarias")
+        for i, bloco in enumerate(blocos):
+            print(f"Bloco {i+1}: {bloco[:100]}...")
+        
         if not blocos:
             print("Nenhuma portaria de naturalização encontrada com o padrão específico.")
             # Fallback para o caso de ter apenas uma portaria colada sem o cabeçalho completo do DOU
@@ -990,38 +1106,46 @@ class PortariaAnalyzer:
                 'arquivo_excel': arquivo_excel,
                 'total_erros': len(erros)
             }], [arquivo_excel] if arquivo_excel else []
+        
         print(f"Encontradas {len(blocos)} portarias de naturalização para análise.")
         todas_pessoas_documento = []
         resultados = []
         arquivos_excel = []
+        
         for i, bloco in enumerate(blocos, 1):
             print(f"\n==============================")
             print(f"Analisando PORTARIA {i}...")
             print(f"Tamanho do bloco: {len(bloco)} caracteres")
             print(f"Primeiros 200 caracteres: {bloco[:200]}...")
+            
             dados_portaria = self.extrair_dados_portaria_direto(bloco, forcar_linha_por_bloco=True)
             if not dados_portaria:
                 print(f"❌ Não foi possível extrair dados da portaria {i}")
                 continue
+                
             erros = self.verificar_erros(dados_portaria)
             erros_duplicatas = self.verificar_duplicatas_entre_portarias(dados_portaria, todas_pessoas_documento)
             erros.extend(erros_duplicatas)
+            
             for pessoa in dados_portaria['pessoas']:
                 todas_pessoas_documento.append({
                     'nome': pessoa['nome'],
                     'data_nascimento': pessoa['data_nascimento'],
                     'portaria_origem': dados_portaria['numero']
                 })
+            
             arquivo_excel = None
             if gerar_excel:
                 arquivo_excel = self.gerar_relatorio_excel(dados_portaria, erros)
                 arquivos_excel.append(arquivo_excel)
+            
             resultados.append({
                 'dados_portaria': dados_portaria,
                 'erros': erros,
                 'arquivo_excel': arquivo_excel,
                 'total_erros': len(erros)
             })
+        
         return resultados, arquivos_excel
 
     def verificar_duplicatas_entre_portarias(self, dados_portaria_atual, todas_pessoas_documento):
