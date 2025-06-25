@@ -8,6 +8,8 @@ import pandas as pd
 
 # Importar o analisador de portarias
 from portaria_analyzer import PortariaAnalyzer
+# Importar o módulo de busca automática
+from busca_automatica_dou import BuscadorAutomaticoDOU
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sua_chave_secreta_aqui'
@@ -19,6 +21,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Variável global para armazenar o analisador
 analyzer = None
+# Variável global para armazenar o buscador automático
+buscador_automatico = None
 
 @app.route('/')
 def index():
@@ -186,6 +190,96 @@ def analisar():
                 })
     
     return render_template('analisar.html')
+
+@app.route('/busca_automatica')
+def busca_automatica():
+    """Página de busca automática no DOU"""
+    return render_template('busca_automatica.html')
+
+@app.route('/buscar_automatico', methods=['POST'])
+def buscar_automatico():
+    """Endpoint para busca automática de portarias no DOU"""
+    global buscador_automatico
+    
+    try:
+        # Obter dados da requisição
+        dados = request.get_json()
+        data_inicio = dados.get('data_inicio')
+        data_fim = dados.get('data_fim')
+        tipo_busca = dados.get('tipo_busca', 'especifica')  # Padrão: busca específica
+        palavras_chave = dados.get('palavras_chave', [])
+        
+        if not data_inicio or not data_fim:
+            return jsonify({
+                'success': False,
+                'message': 'Datas de início e fim são obrigatórias'
+            })
+        
+        # Inicializar buscador se necessário
+        if buscador_automatico is None:
+            buscador_automatico = BuscadorAutomaticoDOU()
+        
+        # Realizar busca baseada no tipo
+        if tipo_busca == 'especifica':
+            # Busca específica (filtros do DOU)
+            print("🔍 Usando busca específica (filtros DOU)")
+            portarias = buscador_automatico.buscar_portarias_especificas(
+                data_inicio=data_inicio,
+                data_fim=data_fim
+            )
+            
+            # Se não encontrar nada, tentar busca geral
+            if not portarias:
+                print("⚠️ Busca específica não retornou resultados, tentando busca geral...")
+                portarias = buscador_automatico.buscar_portarias_periodo(
+                    data_inicio=data_inicio,
+                    data_fim=data_fim,
+                    palavras_chave=palavras_chave if palavras_chave else None
+                )
+        else:
+            # Busca geral
+            print("🔍 Usando busca geral")
+            portarias = buscador_automatico.buscar_portarias_periodo(
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+                palavras_chave=palavras_chave if palavras_chave else None
+            )
+        
+        if portarias:
+            # Analisar portarias encontradas
+            df = buscador_automatico.analisar_portarias_encontradas(portarias)
+            
+            if not df.empty:
+                # Gerar arquivo
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                nome_arquivo = f"naturalizacoes_{data_inicio}_a_{data_fim}_{timestamp}.xlsx"
+                df.to_excel(nome_arquivo, index=False, engine='openpyxl')
+                
+                total_registros = len(df)
+                
+                return jsonify({
+                    'success': True,
+                    'arquivo': nome_arquivo,
+                    'total_registros': total_registros,
+                    'mensagem': f'Busca concluída com sucesso! {total_registros} registros encontrados.',
+                    'tipo_busca': tipo_busca
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Portarias encontradas, mas nenhum dado foi extraído.'
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhuma portaria foi encontrada no período especificado.'
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Erro durante a busca: {str(e)}'
+        })
 
 @app.route('/download/<filename>')
 def download_file(filename):

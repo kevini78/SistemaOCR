@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Busca Automática DOU - Sistema de Análise de Portarias</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            padding: 2rem;
+        }
+        .form-container {
+            padding: 2rem;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        .progress-container {
+            display: none;
+            margin-top: 2rem;
+        }
+        .result-container {
+            margin-top: 2rem;
+            display: none;
+        }
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 5px solid #667eea;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #28a745;
+        }
+        .info-icon {
+            color: #667eea;
+            font-size: 1.2rem;
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="main-container">
+                    <!-- Header -->
+                    <div class="header text-center">
+                        <h1><i class="fas fa-search"></i> Busca Automática DOU</h1>
+                        <p class="mb-0">Sistema baseado no Ro-DOU para busca automática de portarias de naturalização</p>
+                    </div>
+
+                    <!-- Form Container -->
+                    <div class="form-container">
+                        <!-- Informações -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="feature-card">
+                                    <h5><i class="fas fa-info-circle info-icon"></i>Como funciona</h5>
+                                    <p class="mb-0">O sistema busca automaticamente no Diário Oficial da União por portarias de naturalização no período especificado e extrai todos os dados das pessoas naturalizadas.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-card">
+                                    <h5><i class="fas fa-download info-icon"></i>Resultado</h5>
+                                    <p class="mb-0">Uma planilha Excel será gerada com todos os dados extraídos: nome, documento, processo, país, estado, idade, data de nascimento e informações da portaria.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Formulário de Busca -->
+                        <form id="buscaForm">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="dataInicio" class="form-label">
+                                            <i class="fas fa-calendar-alt"></i> Data de Início
+                                        </label>
+                                        <input type="date" class="form-control" id="dataInicio" name="dataInicio" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="dataFim" class="form-label">
+                                            <i class="fas fa-calendar-alt"></i> Data de Fim
+                                        </label>
+                                        <input type="date" class="form-control" id="dataFim" name="dataFim" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-filter"></i> Tipo de Busca
+                                </label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="tipoBusca" id="buscaEspecifica" value="especifica" checked>
+                                    <label class="form-check-label" for="buscaEspecifica">
+                                        <strong>Busca Específica</strong> (Recomendado)
+                                        <br><small class="text-muted">Simula o processo manual: PORTARIA + Ministério da Justiça + Secretaria Nacional de Justiça</small>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="tipoBusca" id="buscaGeral" value="geral">
+                                    <label class="form-check-label" for="buscaGeral">
+                                        <strong>Busca Geral</strong>
+                                        <br><small class="text-muted">Busca por palavras-chave em todo o DOU</small>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="mb-3" id="palavrasChaveContainer" style="display: none;">
+                                <label for="palavrasChave" class="form-label">
+                                    <i class="fas fa-key"></i> Palavras-chave (apenas para busca geral)
+                                </label>
+                                <textarea class="form-control" id="palavrasChave" name="palavrasChave" rows="3" 
+                                    placeholder="Digite palavras-chave separadas por vírgula. Deixe em branco para usar as padrão: naturalização, PORTARIA, art. 65, art. 67, art. 70"></textarea>
+                            </div>
+
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-search"></i> Iniciar Busca Automática
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Progress Container -->
+                        <div class="progress-container" id="progressContainer">
+                            <div class="status-card">
+                                <h5><i class="fas fa-spinner loading-spinner"></i> Buscando portarias...</h5>
+                                <div class="progress mb-3">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         role="progressbar" style="width: 0%" id="progressBar"></div>
+                                </div>
+                                <p id="statusText">Iniciando busca...</p>
+                            </div>
+                        </div>
+
+                        <!-- Result Container -->
+                        <div class="result-container" id="resultContainer">
+                            <div class="status-card">
+                                <h5><i class="fas fa-check-circle text-success"></i> Busca Concluída!</h5>
+                                <div id="resultContent"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Mostrar/ocultar campo de palavras-chave baseado no tipo de busca
+        document.querySelectorAll('input[name="tipoBusca"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const palavrasChaveContainer = document.getElementById('palavrasChaveContainer');
+                if (this.value === 'geral') {
+                    palavrasChaveContainer.style.display = 'block';
+                } else {
+                    palavrasChaveContainer.style.display = 'none';
+                }
+            });
+        });
+
+        document.getElementById('buscaForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const dataInicio = document.getElementById('dataInicio').value;
+            const dataFim = document.getElementById('dataFim').value;
+            const tipoBusca = document.querySelector('input[name="tipoBusca"]:checked').value;
+            const palavrasChave = document.getElementById('palavrasChave').value;
+            
+            if (!dataInicio || !dataFim) {
+                alert('Por favor, preencha as datas de início e fim.');
+                return;
+            }
+            
+            if (dataInicio > dataFim) {
+                alert('A data de início deve ser menor que a data de fim.');
+                return;
+            }
+            
+            // Mostrar progresso
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('resultContainer').style.display = 'none';
+            
+            // Simular progresso
+            let progress = 0;
+            const progressBar = document.getElementById('progressBar');
+            const statusText = document.getElementById('statusText');
+            
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 90) progress = 90;
+                progressBar.style.width = progress + '%';
+                
+                if (tipoBusca === 'especifica') {
+                    if (progress < 30) {
+                        statusText.textContent = 'Buscando portarias com filtros específicos...';
+                    } else if (progress < 60) {
+                        statusText.textContent = 'Analisando portarias encontradas...';
+                    } else {
+                        statusText.textContent = 'Extraindo dados das pessoas...';
+                    }
+                } else {
+                    if (progress < 30) {
+                        statusText.textContent = 'Buscando portarias no DOU...';
+                    } else if (progress < 60) {
+                        statusText.textContent = 'Analisando portarias encontradas...';
+                    } else {
+                        statusText.textContent = 'Extraindo dados das pessoas...';
+                    }
+                }
+            }, 500);
+            
+            // Fazer requisição
+            fetch('/buscar_automatico', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    data_inicio: dataInicio,
+                    data_fim: dataFim,
+                    tipo_busca: tipoBusca,
+                    palavras_chave: palavrasChave ? palavrasChave.split(',').map(p => p.trim()) : []
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                statusText.textContent = 'Concluído!';
+                
+                setTimeout(() => {
+                    document.getElementById('progressContainer').style.display = 'none';
+                    document.getElementById('resultContainer').style.display = 'block';
+                    
+                    const resultContent = document.getElementById('resultContent');
+                    if (data.success) {
+                        resultContent.innerHTML = `
+                            <div class="alert alert-success">
+                                <h6><i class="fas fa-file-excel"></i> Planilha gerada com sucesso!</h6>
+                                <p><strong>Arquivo:</strong> ${data.arquivo}</p>
+                                <p><strong>Total de registros:</strong> ${data.total_registros}</p>
+                                <p><strong>Período:</strong> ${dataInicio} a ${dataFim}</p>
+                                <p><strong>Tipo de busca:</strong> ${tipoBusca === 'especifica' ? 'Específica (filtros DOU)' : 'Geral'}</p>
+                                <a href="/download/${data.arquivo}" class="btn btn-success">
+                                    <i class="fas fa-download"></i> Baixar Planilha
+                                </a>
+                            </div>
+                        `;
+                    } else {
+                        resultContent.innerHTML = `
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-exclamation-triangle"></i> ${data.mensagem}</h6>
+                                <p>Nenhuma portaria foi encontrada no período especificado.</p>
+                                <p><strong>Dicas:</strong></p>
+                                <ul>
+                                    <li>Tente um período menor (ex: 3 meses)</li>
+                                    <li>Use a busca específica para melhores resultados</li>
+                                    <li>Verifique se a API do Querido Diário está disponível</li>
+                                </ul>
+                            </div>
+                        `;
+                    }
+                }, 1000);
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('resultContainer').style.display = 'block';
+                
+                document.getElementById('resultContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-times-circle"></i> Erro na busca</h6>
+                        <p>Ocorreu um erro durante a busca: ${error.message}</p>
+                        <p><strong>Possíveis causas:</strong></p>
+                        <ul>
+                            <li>Problema de conexão com a internet</li>
+                            <li>API do Querido Diário temporariamente indisponível</li>
+                            <li>Período muito longo (tente dividir em partes menores)</li>
+                        </ul>
+                    </div>
+                `;
+            });
+        });
+        
+        // Definir datas padrão (último ano)
+        const hoje = new Date();
+        const umAnoAtras = new Date(hoje.getFullYear() - 1, hoje.getMonth(), hoje.getDate());
+        
+        document.getElementById('dataFim').value = hoje.toISOString().split('T')[0];
+        document.getElementById('dataInicio').value = umAnoAtras.toISOString().split('T')[0];
+    </script>
+</body>
+</html> 
